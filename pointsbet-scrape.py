@@ -9,6 +9,8 @@ from bs4 import BeautifulSoup
 import time
 import json
 
+from matplotlib import pyplot as plt
+
 
 # Logs into facebook
 def tryToLoginFB(username, password, pageName):
@@ -115,7 +117,7 @@ def getPageLikes(pageSoup):
 
 
 
-def getPageSoup(pageToScrape, update, xpath="", scroll=False):
+def getPageSoup(pageToScrape, update=True, xpath="", scroll=False):
   
     # Get HTML and write to file
     if(update):
@@ -154,30 +156,42 @@ def getPostLikes(pageSoup):
     
     
     # Extract number of page likes
-    numLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
+    numLikesList = pageSoup.find_all(elementToScrape, class_= classNumLikes)
 
-    del numLikesArr[1::2]
+    del numLikesList[1::2]
 
     #Delete every second starting at 2nd element
-    for i in range(len(numLikesArr)):
+    for i in range(len(numLikesList)):
        
-        numLikesArr[i] = strToNum(numLikesArr[i].text)
+        numLikesList[i] = strToNum(numLikesList[i].text)
         
         
-    return numLikesArr
+    return list(reversed(numLikesList))
 
 
 if __name__ == '__main__':
+    # Config
+    update = False
+    pointsbet = "pointsbet"
 
-    xpathPageLikes = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[1]/div[2]/div[1]/div/div/div/div[2]/div[4]/div/div/div[2]/div/div/span/span"
-    pointsbetSoup = getPageSoup("pointsbet", False, xpath=xpathPageLikes)
+    # Get Soup
+    pointsbetSoup = getPageSoup(pointsbet, update=update, scroll=True)
 
-    print(getPageLikes(pointsbetSoup))
+    # Get page and post likes
+    PBpageLikes = getPageLikes(pointsbetSoup)
+    postLikesList = getPostLikes(pointsbetSoup)
+
+    print(PBpageLikes)
+    print(postLikesList)
+
+    # plt.bar(range(len(postLikesList)), postLikesList)
+    plt.plot(postLikesList)
+
+    plt.xlabel("Post number")
+    plt.ylabel('Number of likes')
+    plt.title(pointsbet + " likes per post over time." )
     
-    #xpathPostLikes = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[2]/div/div/div/div[1]/div[2]/div/div/div/div/div/div/div/div/div/div[2]/div/div[4]/div/div/div[1]/div[1]/div/div[1]/div/span/div/span[2]/span/span"
-    pointsbetSoup = getPageSoup("pointsbet", False, scroll=True)
-    
-    print(getPostLikes(pointsbetSoup))
+    plt.savefig(pointsbet + ".png")
 
     
 
