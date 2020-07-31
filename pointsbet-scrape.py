@@ -11,6 +11,8 @@ import json
 
 from matplotlib import pyplot as plt
 
+from datetime import date
+
 
 # Logs into facebook
 def tryToLoginFB(username, password, pageName):
@@ -21,7 +23,7 @@ def tryToLoginFB(username, password, pageName):
     chrome_options = Options()  
 
     # Should open window or not?
-    #chrome_options.add_argument("--headless")  
+    chrome_options.add_argument("--headless")  
 
     chrome_options.add_argument("--window-size=%s" % WINDOW_SIZE)
     chrome_options.add_argument("disable-notifications")
@@ -45,20 +47,19 @@ def printLoginTest(driver):
         print("Log in Failure")
 
 
-def getPageSoupOnline(driver, xpath="", scroll=False):
+def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
 
     try:
         if(xpath):
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
         
         if(scroll):
-            print("scroll")
             SCROLL_PAUSE_TIME = 2
 
             # Get scroll height
             last_height = driver.execute_script("return document.body.scrollHeight")
 
-            while True:
+            for i in range(maxScroll):
                 # Scroll down to bottom
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
@@ -169,29 +170,67 @@ def getPostLikes(pageSoup):
     return list(reversed(numLikesList))
 
 
-if __name__ == '__main__':
-    # Config
-    update = False
-    pointsbet = "pointsbet"
-
-    # Get Soup
-    pointsbetSoup = getPageSoup(pointsbet, update=update, scroll=True)
-
-    # Get page and post likes
-    PBpageLikes = getPageLikes(pointsbetSoup)
-    postLikesList = getPostLikes(pointsbetSoup)
-
-    print(PBpageLikes)
-    print(postLikesList)
-
+def plotLikes(pageName, postLikesList):
     # plt.bar(range(len(postLikesList)), postLikesList)
     plt.plot(postLikesList)
 
     plt.xlabel("Post number")
     plt.ylabel('Number of likes')
-    plt.title(pointsbet + " likes per post over time." )
+    plt.title(pageName + " likes per post over time." )
+    plt.savefig(pageName + ".png")
+
+
+def scrapeLikes(pageName, update=True):
+
+    pageLog = pageName + ".txt"
+    today = date.today()
+    last_line = ""
+
+    # Create the file if needed
+    with open(pageLog, "a") as fileHandle:
+        pass
+
+    with open(pageLog, "r") as fileHandle:
+        for last_line in fileHandle:
+            pass  
+
+    # Get Soup
+    try:
+        if(last_line.split(", ")[1].split('\n')[0] == today.strftime("%d/%m/%Y")):
+            print("Date already logged")
+            update = False
+    except IndexError:
+        pass
+
+    pointsbetSoup = getPageSoup(pageName, update, scroll=True)
+
+    # Get page and post likes
+    pageLikes = getPageLikes(pointsbetSoup)
+    postLikesList = getPostLikes(pointsbetSoup)
+
+    print(pageLikes)
+    print(postLikesList)
+
+    plotLikes(pageName, postLikesList)
     
-    plt.savefig(pointsbet + ".png")
+    
+    if(update):   
+        with open(pageLog, "a") as fileHandle: 
+            fileHandle.write(pageLikes + today.strftime(", %d/%m/%Y\n"))
+                
+            
+            
+
+
+
+
+if __name__ == '__main__':
+    scrapeLikes("pointsbet", update=True)
+
+
+
+    
+    
 
     
 
