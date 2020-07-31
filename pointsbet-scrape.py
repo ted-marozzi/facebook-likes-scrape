@@ -19,42 +19,65 @@ def tryToLoginFB(username, password, pageName):
     chrome_options = Options()  
 
     # Should open window or not?
-    chrome_options.add_argument("--headless")  
+    #chrome_options.add_argument("--headless")  
 
     chrome_options.add_argument("--window-size=%s" % WINDOW_SIZE)
+    chrome_options.add_argument("disable-notifications")
     # Opens page and fills in form
-    browser = webdriver.Chrome(CHROMEDRIVER_PATH, options=chrome_options)
+    driver = webdriver.Chrome(CHROMEDRIVER_PATH, options=chrome_options)
     pageName = '/' + pageName
-    browser.get("https://www.facebook.com" + pageName)
-    browser.find_element_by_xpath('//input[@id="email"]').send_keys(username)
-    browser.find_element_by_xpath('//input[@id="pass"]').send_keys(password)
-    browser.find_element_by_xpath('//input[@value="Log In"]').click()
+    driver.get("https://www.facebook.com" + pageName)
+    driver.find_element_by_xpath('//input[@id="email"]').send_keys(username)
+    driver.find_element_by_xpath('//input[@id="pass"]').send_keys(password)
+    driver.find_element_by_xpath('//input[@value="Log In"]').click()
 
 
-    return browser
+    return driver
 
 
-def printLoginTest(browser):
+def printLoginTest(driver):
 
-    if "logout" in browser.page_source:
+    if "logout" in driver.page_source:
         print("Log in Success")
     else:
         print("Log in Failure")
 
 
-def getPageSoupOnline(browser, xpath=""):
+def getPageSoupOnline(driver, xpath="", scroll=False):
 
     try:
         if(xpath):
-            WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-        else:
-            time.sleep(2)
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
+        
+        if(scroll):
+            print("scroll")
+            SCROLL_PAUSE_TIME = 2
+
+            # Get scroll height
+            last_height = driver.execute_script("return document.body.scrollHeight")
+
+            while True:
+                # Scroll down to bottom
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+                # Wait to load page
+                time.sleep(SCROLL_PAUSE_TIME)
+
+                # Calculate new scroll height and compare with last scroll height
+                new_height = driver.execute_script("return document.body.scrollHeight")
+                if new_height == last_height:
+                    break
+                last_height = new_height
+
+            if( not scroll and not xpath):
+                time.sleep(5)
+            
     except:
         print("Exception element not located.")
 
     finally:
-        soup = BeautifulSoup(browser.page_source, 'html.parser')
-        browser.quit()
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        driver.quit()
         return soup
 
 
@@ -76,9 +99,12 @@ def getPageLikes(pageSoup):
     
     # Extract number of page likes
     numberOfLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
+    try:
 
-    numberOfLikesArr = numberOfLikesArr[indexNumLikes].text.split(" ")[0].split(",")
-    
+        numberOfLikesArr = numberOfLikesArr[indexNumLikes].text.split(" ")[0].split(",")
+    except IndexError:
+        print("Empty Array")
+
     numberOfLikes = ""
     lenArr = len(numberOfLikesArr)
 
@@ -89,45 +115,69 @@ def getPageLikes(pageSoup):
 
 
 
-def getPageSoup(pageToScrape, update, xpath=""):
-    elementToScrape = "span"
-    classNumLikes = "oi732d6d ik7dh3pa d2edcug0 qv66sw1b c1et5uql jq4qci2q a3bd9o3v knj5qynh oo9gr5id"
-    indexNumLikes = 1
+def getPageSoup(pageToScrape, update, xpath="", scroll=False):
+  
     # Get HTML and write to file
     if(update):
         # Get Authentifaction
         secret = getSecretKeys()
 
         # Login to browser
-        browser = tryToLoginFB(secret["Username"], secret["Password"], pageToScrape)
+        driver = tryToLoginFB(secret["Username"], secret["Password"], pageToScrape)
         # Test login
-        printLoginTest(browser)
+        printLoginTest(driver)
 
-        pageSoup = getPageSoupOnline(browser, xpath)
+        pageSoup = getPageSoupOnline(driver, xpath=xpath, scroll=scroll)
         writeSoupToFile(pageSoup, pageToScrape)
     else:
         # Get HTML from file
-        pageSoup = BeautifulSoup(open(pageToScrape+".html"), "html.parser")
+        pageSoup = BeautifulSoup(open(pageToScrape+".html", encoding="utf8"), "html.parser")
     
 
     return pageSoup
 
+# Function by https://gist.github.com/SanthoshBala18
+def strToNum(x):
+    total_stars = 0
+    num_map = {'K':1000, 'M':1000000, 'B':1000000000, 'k':1000}
+    if x.isdigit():
+        total_stars = int(x)
+    else:
+        if len(x) > 1:
+            total_stars = float(x[:-1]) * num_map.get(x[-1].upper(), 1)
+    return int(total_stars)
+#
 
-def getPostLikes(pageToScrape, update):
-    pass
+def getPostLikes(pageSoup):
+    elementToScrape = "span"
+    classNumLikes = "pcp91wgn"
+    
+    
+    # Extract number of page likes
+    numLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
+
+    del numLikesArr[1::2]
+
+    #Delete every second starting at 2nd element
+    for i in range(len(numLikesArr)):
+       
+        numLikesArr[i] = strToNum(numLikesArr[i].text)
+        
+        
+    return numLikesArr
 
 
 if __name__ == '__main__':
 
     xpathPageLikes = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[1]/div[2]/div[1]/div/div/div/div[2]/div[4]/div/div/div[2]/div/div/span/span"
-    pageSoup = getPageSoup("pointsbet", False, xpathPageLikes)
+    pointsbetSoup = getPageSoup("pointsbet", False, xpath=xpathPageLikes)
 
-    print(getPageLikes(pageSoup))
+    print(getPageLikes(pointsbetSoup))
     
-    xpathPostLikes = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[2]/div/div/div/div[1]/div[2]/div/div/div/div/div/div/div/div/div/div[2]/div/div[4]/div/div/div[1]/div[1]/div/div[1]/div/span/div/span[2]/span/span"
-    pageSoup = getPageSoup("pointsbet", False, xpathPostLikes)
+    #xpathPostLikes = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[2]/div/div/div/div[1]/div[2]/div/div/div/div/div/div/div/div/div/div[2]/div/div[4]/div/div/div[1]/div[1]/div/div[1]/div/span/div/span[2]/span/span"
+    pointsbetSoup = getPageSoup("pointsbet", False, scroll=True)
     
-    
+    print(getPostLikes(pointsbetSoup))
 
     
 
