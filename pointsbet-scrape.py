@@ -42,11 +42,13 @@ def printLoginTest(browser):
         print("Log in Failure")
 
 
-def getPageSoup(browser, xpath):
+def getPageSoupOnline(browser, xpath=""):
 
     try:
-        WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-      
+        if(xpath):
+            WebDriverWait(browser, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
+        else:
+            time.sleep(2)
     except:
         print("Exception element not located.")
 
@@ -67,13 +69,30 @@ def getSecretKeys():
         return json.load(fileHandle)
 
 # Works as of 31/07/2020
-def getNumLikes(update, pageToScrape):
-    # Configuration
+def getPageLikes(pageSoup):
     elementToScrape = "span"
     classNumLikes = "oi732d6d ik7dh3pa d2edcug0 qv66sw1b c1et5uql jq4qci2q a3bd9o3v knj5qynh oo9gr5id"
-    indexToScrape = 1
-    xpath = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[1]/div[2]/div[1]/div/div/div/div[2]/div[4]/div/div/div[2]/div/div/span/span"
+    indexNumLikes = 1
+    
+    # Extract number of page likes
+    numberOfLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
 
+    numberOfLikesArr = numberOfLikesArr[indexNumLikes].text.split(" ")[0].split(",")
+    
+    numberOfLikes = ""
+    lenArr = len(numberOfLikesArr)
+
+    for i in range(lenArr):
+        numberOfLikes = numberOfLikesArr[lenArr - i - 1] + numberOfLikes
+
+    return numberOfLikes
+
+
+
+def getPageSoup(pageToScrape, update, xpath=""):
+    elementToScrape = "span"
+    classNumLikes = "oi732d6d ik7dh3pa d2edcug0 qv66sw1b c1et5uql jq4qci2q a3bd9o3v knj5qynh oo9gr5id"
+    indexNumLikes = 1
     # Get HTML and write to file
     if(update):
         # Get Authentifaction
@@ -84,22 +103,31 @@ def getNumLikes(update, pageToScrape):
         # Test login
         printLoginTest(browser)
 
-        pageSoup = getPageSoup(browser, xpath)
+        pageSoup = getPageSoupOnline(browser, xpath)
         writeSoupToFile(pageSoup, pageToScrape)
     else:
         # Get HTML from file
         pageSoup = BeautifulSoup(open(pageToScrape+".html"), "html.parser")
     
-    
-    # Extract number of page likes
-    numberOfLikes = pageSoup.find_all(elementToScrape, class_= classNumLikes)
-    
-    return numberOfLikes[indexToScrape].text
+
+    return pageSoup
+
+
+def getPostLikes(pageToScrape, update):
+    pass
 
 
 if __name__ == '__main__':
-    # Configuration
-    print(getNumLikes(False, "pointsbet"))
+
+    xpathPageLikes = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[1]/div[2]/div[1]/div/div/div/div[2]/div[4]/div/div/div[2]/div/div/span/span"
+    pageSoup = getPageSoup("pointsbet", False, xpathPageLikes)
+
+    print(getPageLikes(pageSoup))
+    
+    xpathPostLikes = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[2]/div/div/div/div[1]/div[2]/div/div/div/div/div/div/div/div/div/div[2]/div/div[4]/div/div/div[1]/div[1]/div/div[1]/div/span/div/span[2]/span/span"
+    pageSoup = getPageSoup("pointsbet", False, xpathPostLikes)
+    
+    
 
     
 
