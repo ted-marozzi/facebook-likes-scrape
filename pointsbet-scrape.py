@@ -13,6 +13,8 @@ from matplotlib import pyplot as plt
 
 from datetime import date
 
+import os
+
 
 # Logs into facebook
 def tryToLoginFB(username, password, pageName):
@@ -85,7 +87,7 @@ def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
 
 
 def writeSoupToFile(pageSoup, pageName):
-    with open(pageName + ".html", "w", encoding="utf=8") as file:
+    with open(pageName + "/" + pageName + ".html", "w", encoding="utf=8") as file:
         file.write(str(pageSoup))
 
 
@@ -134,7 +136,7 @@ def getPageSoup(pageToScrape, update=True, xpath="", scroll=False):
         writeSoupToFile(pageSoup, pageToScrape)
     else:
         # Get HTML from file
-        pageSoup = BeautifulSoup(open(pageToScrape+".html", encoding="utf8"), "html.parser")
+        pageSoup = BeautifulSoup(open(pageToScrape + "/" + pageToScrape+ ".html", encoding="utf8"), "html.parser")
     
 
     return pageSoup
@@ -177,12 +179,16 @@ def plotLikes(pageName, postLikesList):
     plt.xlabel("Post number")
     plt.ylabel('Number of likes')
     plt.title(pageName + " likes per post over time." )
-    plt.savefig(pageName + ".png")
+    plt.savefig(pageName + "/" + pageName + ".png")
 
 
 def scrapeLikes(pageName, update=True):
 
-    pageLog = pageName + ".txt"
+    pageLog = pageName + "/" + pageName + ".txt"
+
+    if not os.path.exists(pageName):
+        os.makedirs(pageName)
+        
     today = date.today()
     last_line = ""
 
@@ -232,7 +238,7 @@ def scrapeLikes(pageName, update=True):
                 
             
 if __name__ == '__main__':
-    postLikesList = scrapeLikes("pointsbet", update=True)
+    postLikesList = scrapeLikes("alltimelow")
     
 
     
