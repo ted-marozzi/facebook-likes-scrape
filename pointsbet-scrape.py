@@ -42,9 +42,9 @@ def tryToLoginFB(username, password, pageName):
 def printLoginTest(driver):
 
     if "logout" in driver.page_source:
-        print("Log in Success")
+        print("Login succeded")
     else:
-        print("Log in Failure")
+        print("Login failed")
 
 
 def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
@@ -60,6 +60,7 @@ def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
             last_height = driver.execute_script("return document.body.scrollHeight")
 
             for i in range(maxScroll):
+                print("Num Scrolls:", i)
                 # Scroll down to bottom
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
@@ -71,10 +72,9 @@ def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
                 if new_height == last_height:
                     break
                 last_height = new_height
-
+            
             if( not scroll and not xpath):
                 time.sleep(5)
-            
     except:
         print("Exception element not located.")
 
@@ -193,6 +193,8 @@ def scrapeLikes(pageName, update=True):
     with open(pageLog, "r") as fileHandle:
         for last_line in fileHandle:
             pass  
+    
+        
 
     # Get Soup
     try:
@@ -202,32 +204,36 @@ def scrapeLikes(pageName, update=True):
     except IndexError:
         pass
 
-    pointsbetSoup = getPageSoup(pageName, update, scroll=True)
+    soup = getPageSoup(pageName, update, scroll=True)
 
     # Get page and post likes
-    pageLikes = getPageLikes(pointsbetSoup)
-    postLikesList = getPostLikes(pointsbetSoup)
+    pageLikes = getPageLikes(soup)
+    postLikesList = getPostLikes(soup)
 
-    print(pageLikes)
+    print(pageName + " page likes: " + pageLikes)
+    print(pageName + " post likes: ", end="")
     print(postLikesList)
 
     plotLikes(pageName, postLikesList)
-    
+
+
+    avLikes = sum(postLikesList)/len(postLikesList)
     
     if(update):   
         with open(pageLog, "a") as fileHandle: 
+
+            if(last_line == ""):
+                
+                fileHandle.write("Page Likes, Date\n")
+
             fileHandle.write(pageLikes + today.strftime(", %d/%m/%Y\n"))
+
+    return postLikesList
                 
             
-            
-
-
-
-
 if __name__ == '__main__':
-    scrapeLikes("pointsbet", update=True)
-
-
+    postLikesList = scrapeLikes("pointsbet", update=True)
+    
 
     
     
