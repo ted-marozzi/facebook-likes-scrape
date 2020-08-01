@@ -49,20 +49,23 @@ def printLoginTest(driver):
         print("Login failed")
 
 
-def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
+def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=50):
 
     try:
         if(xpath):
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
         
         if(scroll):
-            SCROLL_PAUSE_TIME = 2
+            SCROLL_PAUSE_TIME = 0.5
+            RETRYS = 5
 
             # Get scroll height
             last_height = driver.execute_script("return document.body.scrollHeight")
 
             for i in range(maxScroll):
                 print("Num Scrolls:", i)
+                
+                iterCount = 0
                 # Scroll down to bottom
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
@@ -71,8 +74,13 @@ def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
 
                 # Calculate new scroll height and compare with last scroll height
                 new_height = driver.execute_script("return document.body.scrollHeight")
-                if new_height == last_height:
+                if new_height == last_height and iterCount == RETRYS:
                     break
+                elif new_height == last_height:
+                    print("Retry", iterCount + 1, "for scroll", i)
+                    iterCount+=1
+                    i-=1
+                
                 last_height = new_height
             
             if( not scroll and not xpath):
@@ -87,7 +95,7 @@ def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=20):
 
 
 def writeSoupToFile(pageSoup, pageName):
-    with open(pageName + "/" + pageName + ".html", "w", encoding="utf=8") as file:
+    with open("out" + "/" + pageName + "/" + pageName + ".html", "w", encoding="utf=8") as file:
         file.write(str(pageSoup))
 
 
@@ -120,10 +128,10 @@ def getPageLikes(pageSoup):
 
 
 
-def getPageSoup(pageToScrape, update=True, xpath="", scroll=False):
+def getPageSoup(pageToScrape, updatePostLikes=True, xpath="", scroll=False, maxScroll=50):
   
     # Get HTML and write to file
-    if(update):
+    if(updatePostLikes):
         # Get Authentifaction
         secret = getSecretKeys()
 
@@ -132,12 +140,14 @@ def getPageSoup(pageToScrape, update=True, xpath="", scroll=False):
         # Test login
         printLoginTest(driver)
 
-        pageSoup = getPageSoupOnline(driver, xpath=xpath, scroll=scroll)
+        pageSoup = getPageSoupOnline(driver, xpath=xpath, scroll=scroll, maxScroll=maxScroll)
         writeSoupToFile(pageSoup, pageToScrape)
-    else:
+    elif(os.path.exists("out/" + pageToScrape + "/" + pageToScrape + ".html")):
         # Get HTML from file
-        pageSoup = BeautifulSoup(open(pageToScrape + "/" + pageToScrape+ ".html", encoding="utf8"), "html.parser")
-    
+        pageSoup = BeautifulSoup(open("out" + "/" + pageToScrape + "/" + pageToScrape+ ".html", encoding="utf8"), "html.parser")
+    else:
+        updatePostLikes = True
+        pageSoup = getPageSoup(pageToScrape, updatePostLikes=updatePostLikes, xpath=xpath, scroll=scroll, maxScroll=maxScroll)
 
     return pageSoup
 
@@ -156,7 +166,6 @@ def strToNum(x):
 def getPostLikes(pageSoup):
     elementToScrape = "span"
     classNumLikes = "pcp91wgn"
-    
     
     # Extract number of page likes
     numLikesList = pageSoup.find_all(elementToScrape, class_= classNumLikes)
@@ -179,24 +188,28 @@ def plotLikes(pageName, postLikesList):
     plt.xlabel("Post number")
     plt.ylabel('Number of likes')
     plt.title(pageName + " likes per post over time." )
-    plt.savefig(pageName + "/" + pageName + ".png")
+    plt.savefig("out/" + pageName + "/" + pageName + ".png")
+    plt.clf()
 
 
-def scrapeLikes(pageName, update=True):
+def scrapeLikes(pageName, updatePostLikes=True, maxScroll=50):
 
-    pageLog = pageName + "/" + pageName + ".txt"
+    logPath = "out/" + pageName + "/" + pageName + ".txt"
 
-    if not os.path.exists(pageName):
-        os.makedirs(pageName)
+    if not os.path.exists("out"):
+        os.makedirs("out")
         
+    if not os.path.exists("out/" + pageName):
+        os.makedirs("out/" + pageName)
+
     today = date.today()
     last_line = ""
 
     # Create the file if needed
-    with open(pageLog, "a") as fileHandle:
+    with open(logPath, "a") as fileHandle:
         pass
 
-    with open(pageLog, "r") as fileHandle:
+    with open(logPath, "r") as fileHandle:
         for last_line in fileHandle:
             pass  
     
@@ -206,11 +219,12 @@ def scrapeLikes(pageName, update=True):
     try:
         if(last_line.split(", ")[1].split('\n')[0] == today.strftime("%d/%m/%Y")):
             print("Date already logged")
-            update = False
+            updatePostLikes = False
     except IndexError:
         pass
 
-    soup = getPageSoup(pageName, update, scroll=True)
+    
+    soup = getPageSoup(pageName, updatePostLikes, scroll=True, maxScroll=maxScroll)
 
     # Get page and post likes
     pageLikes = getPageLikes(soup)
@@ -225,25 +239,35 @@ def scrapeLikes(pageName, update=True):
 
     avLikes = sum(postLikesList)/len(postLikesList)
     
-    if(update):   
-        with open(pageLog, "a") as fileHandle: 
+    
+    with open(logPath, "a") as fileHandle: 
 
-            if(last_line == ""):
-                
-                fileHandle.write("Page Likes, Date\n")
+        if(last_line == ""):
+            
+            fileHandle.write("Page Likes, Date\n")
 
-            fileHandle.write(pageLikes + today.strftime(", %d/%m/%Y\n"))
+        fileHandle.write(pageLikes + today.strftime(", %d/%m/%Y\n"))
 
     return postLikesList
                 
             
 if __name__ == '__main__':
-    postLikesList = scrapeLikes("alltimelow")
+    pagesToTrack = ["pointsbet", "sportsbetcomau", "zuck", "OliverTreemusic"]
+    for page in pagesToTrack:
+        postLikesList = scrapeLikes(page, maxScroll=100, updatePostLikes=False)
     
 
-    
-    
-
+    # TODO =>
+    # Lucas: 
+    #   Fix logging error
+    #   More decriptive errors and print info
+    #   Make averging function
+    #    
+    #   
+    # Ted: 
+    #   redesign functions to decopule and de depth
+    #   make pip installable
+    #   scrape profiles
     
 
 
