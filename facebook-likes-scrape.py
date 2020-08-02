@@ -15,22 +15,25 @@ from datetime import date
 
 import os
 
+OUT_PATH = "out/"
+
 
 # Logs into facebook
-def tryToLoginFB(username, password, pageName):
+def _FBLogin(username, password, pageName, chromedriverPath='C:/bin/chromedriver_win32/chromedriver.exe', headless=True):
     # Path to your chromedriver.exe
-    CHROMEDRIVER_PATH = 'C:/bin/chromedriver_win32/chromedriver.exe'
+    # CHROMEDRIVER_PATH = 'C:/bin/chromedriver_win32/chromedriver.exe'
     WINDOW_SIZE = "1920,1080"
 
-    chrome_options = Options()  
+    chromeOptions = Options()  
 
     # Should open window or not?
-    chrome_options.add_argument("--headless")  
+    if headless:
+        chromeOptions.add_argument("--headless")  
 
-    chrome_options.add_argument("--window-size=%s" % WINDOW_SIZE)
-    chrome_options.add_argument("disable-notifications")
+    chromeOptions.add_argument("--window-size=%s" % WINDOW_SIZE)
+    chromeOptions.add_argument("disable-notifications")
     # Opens page and fills in form
-    driver = webdriver.Chrome(CHROMEDRIVER_PATH, options=chrome_options)
+    driver = webdriver.Chrome(chromedriverPath, options=chromeOptions)
     pageName = '/' + pageName
     driver.get("https://www.facebook.com" + pageName)
     driver.find_element_by_xpath('//input[@id="email"]').send_keys(username)
@@ -41,7 +44,7 @@ def tryToLoginFB(username, password, pageName):
     return driver
 
 
-def printLoginTest(driver):
+def _printLoginTest(driver):
 
     if "logout" in driver.page_source:
         print("Login succeded")
@@ -49,110 +52,125 @@ def printLoginTest(driver):
         print("Login failed")
 
 
-def getPageSoupOnline(driver, xpath="", scroll=False, maxScroll=50):
 
-    try:
-        if(xpath):
-            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-        
-        if(scroll):
-            SCROLL_PAUSE_TIME = 0.5
-            RETRYS = 5
-
-            # Get scroll height
-            last_height = driver.execute_script("return document.body.scrollHeight")
-
-            for i in range(maxScroll):
-                print("Num Scrolls:", i)
-                
-                iterCount = 0
-                # Scroll down to bottom
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-
-                # Wait to load page
-                time.sleep(SCROLL_PAUSE_TIME)
-
-                # Calculate new scroll height and compare with last scroll height
-                new_height = driver.execute_script("return document.body.scrollHeight")
-                if new_height == last_height and iterCount == RETRYS:
-                    break
-                elif new_height == last_height:
-                    print("Retry", iterCount + 1, "for scroll", i)
-                    iterCount+=1
-                    i-=1
-                
-                last_height = new_height
-            
-            if( not scroll and not xpath):
-                time.sleep(5)
-    except:
-        print("Exception element not located.")
-
-    finally:
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        driver.quit()
-        return soup
-
-
-def writeSoupToFile(pageSoup, pageName):
-    with open("out" + "/" + pageName + "/" + pageName + ".html", "w", encoding="utf=8") as file:
+def _writeSoupToFile(pageSoup, pageName):
+    with open(OUT_PATH + pageName + "/" + pageName + ".html", "w", encoding="utf=8") as file:
         file.write(str(pageSoup))
 
 
 # Need a json file in directory with Username and Password fields
-def getSecretKeys():
+def _getSecretKeys():
     with open('secret.json') as fileHandle:
         return json.load(fileHandle)
 
 # Works as of 31/07/2020
 def getPageLikes(pageSoup):
-    elementToScrape = "span"
-    classNumLikes = "oi732d6d ik7dh3pa d2edcug0 qv66sw1b c1et5uql jq4qci2q a3bd9o3v knj5qynh oo9gr5id"
-    indexNumLikes = 1
+
     
-    # Extract number of page likes
-    numberOfLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
+    _makeOutDirectory(pageName)
+    logPath = OUT_PATH + pageName + "/" + pageName + ".txt"
+
+    
+    # Create the file if needed
+    with open(logPath, "a") as fileHandle:
+        pass
+
+    last_line = ""
+
+    # Check log file for the last line logged
+    with open(logPath, "r") as fileHandle:
+        for last_line in fileHandle:
+            pass  
+    
+    today = date.today()
+    
     try:
+        if(last_line.split(", ")[1].split('\n')[0] == today.strftime("%d/%m/%Y")):
+            print("Date already logged")
 
-        numberOfLikesArr = numberOfLikesArr[indexNumLikes].text.split(" ")[0].split(",")
+        else:
+            
+            elementToScrape = "span"
+            classNumLikes = "oi732d6d ik7dh3pa d2edcug0 qv66sw1b c1et5uql jq4qci2q a3bd9o3v knj5qynh oo9gr5id"
+            indexNumLikes = 1
+            
+            # Extract number of page likes
+            numberOfLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
+            numberOfLikesArr = numberOfLikesArr[indexNumLikes].text.split(" ")[0].split(",")
+            
+
+            numberOfLikes = ""
+            lenArr = len(numberOfLikesArr)
+
+            for i in range(lenArr):
+                numberOfLikes = numberOfLikesArr[lenArr - i - 1] + numberOfLikes
+
+            return numberOfLikes
+
     except IndexError:
-        print("Empty Array")
-
-    numberOfLikes = ""
-    lenArr = len(numberOfLikesArr)
-
-    for i in range(lenArr):
-        numberOfLikes = numberOfLikesArr[lenArr - i - 1] + numberOfLikes
-
-    return numberOfLikes
+        print("No likes found in soup")
+        return
 
 
 
-def getPageSoup(pageToScrape, updatePostLikes=True, xpath="", scroll=False, maxScroll=50):
-  
-    # Get HTML and write to file
-    if(updatePostLikes):
-        # Get Authentifaction
-        secret = getSecretKeys()
+def getPageSoup(pageName, maxScroll=1):
 
-        # Login to browser
-        driver = tryToLoginFB(secret["Username"], secret["Password"], pageToScrape)
-        # Test login
-        printLoginTest(driver)
+    # Get Authentifaction
+    secret = _getSecretKeys()
 
-        pageSoup = getPageSoupOnline(driver, xpath=xpath, scroll=scroll, maxScroll=maxScroll)
-        writeSoupToFile(pageSoup, pageToScrape)
-    elif(os.path.exists("out/" + pageToScrape + "/" + pageToScrape + ".html")):
-        # Get HTML from file
-        pageSoup = BeautifulSoup(open("out" + "/" + pageToScrape + "/" + pageToScrape+ ".html", encoding="utf8"), "html.parser")
-    else:
-        updatePostLikes = True
-        pageSoup = getPageSoup(pageToScrape, updatePostLikes=updatePostLikes, xpath=xpath, scroll=scroll, maxScroll=maxScroll)
+    # Likes 
+    xpath = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[3]/div[1]/div[4]/div[2]/div/div[1]/div[2]/div[1]/div/div/div/div[2]/div[3]/div[1]/div/div/div[2]/div/div/span/span[1]"
 
+    # Login to browser
+    driver = _FBLogin(secret["Username"], secret["Password"], pageName)
+    # Test login
+    _printLoginTest(driver)
+
+    # Try getting xpath element if not specified scroll and wait as neccassary
+    try:
+        
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
+        
+        SCROLL_PAUSE_TIME = 1
+        RETRYS = 3
+
+        # Get scroll height
+        last_height = driver.execute_script("return document.body.scrollHeight")
+
+        for i in range(maxScroll):
+            print("Num Scrolls:", i)
+                
+            iterCount = 0
+            # Scroll down to bottom
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+            # Wait to load page
+            time.sleep(SCROLL_PAUSE_TIME)
+
+            # Calculate new scroll height and compare with last scroll height
+            new_height = driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height and iterCount == RETRYS:
+                break
+            elif new_height == last_height:
+                print("Retry", iterCount + 1, "for scroll", i)
+                iterCount+=1
+                i-=1
+               
+            last_height = new_height
+    except:
+        print("Exception element not located.")
+
+    finally:
+        pageSoup = BeautifulSoup(driver.page_source, 'html.parser')
+        driver.quit()
+
+    _makeOutDirectory(pageName)
+    _writeSoupToFile(pageSoup, pageName)
+    
     return pageSoup
 
 # Function by https://gist.github.com/SanthoshBala18
-def strToNum(x):
+def _strToNum(x):
     total_stars = 0
     num_map = {'K':1000, 'M':1000000, 'B':1000000000, 'k':1000}
     if x.isdigit():
@@ -162,23 +180,6 @@ def strToNum(x):
             total_stars = float(x[:-1]) * num_map.get(x[-1].upper(), 1)
     return int(total_stars)
 #
-
-def getPostLikes(pageSoup):
-    elementToScrape = "span"
-    classNumLikes = "pcp91wgn"
-    
-    # Extract number of page likes
-    numLikesList = pageSoup.find_all(elementToScrape, class_= classNumLikes)
-
-    del numLikesList[1::2]
-
-    #Delete every second starting at 2nd element
-    for i in range(len(numLikesList)):
-       
-        numLikesList[i] = strToNum(numLikesList[i].text)
-        
-        
-    return list(reversed(numLikesList))
 
 
 def plotLikes(pageName, postLikesList):
@@ -191,71 +192,74 @@ def plotLikes(pageName, postLikesList):
     plt.savefig("out/" + pageName + "/" + pageName + ".png")
     plt.clf()
 
-
-def scrapeLikes(pageName, updatePostLikes=True, maxScroll=50):
-
-    logPath = "out/" + pageName + "/" + pageName + ".txt"
-
+def _makeOutDirectory(pageName):
+    # Check if / needed
     if not os.path.exists("out"):
         os.makedirs("out")
         
-    if not os.path.exists("out/" + pageName):
-        os.makedirs("out/" + pageName)
+    # Creates the page folder if needed
+    if not os.path.exists(OUT_PATH + pageName):
+        os.makedirs(OUT_PATH + pageName)
 
-    today = date.today()
-    last_line = ""
 
-    # Create the file if needed
-    with open(logPath, "a") as fileHandle:
-        pass
 
-    with open(logPath, "r") as fileHandle:
-        for last_line in fileHandle:
-            pass  
+
+# Extracts the post likes from a facebook page soup
+def getPagePostLikes(pageSoup):
+
+
+    _makeOutDirectory(pageName)
     
+    elementToScrape = "span"
+    classNumLikes = "pcp91wgn"
+    
+    # Extract number of page likes
+    postLikesList = pageSoup.find_all(elementToScrape, class_= classNumLikes)
+
+    del postLikesList[1::2]
+
+    #Delete every second starting at 2nd element
+    for i in range(len(postLikesList)):
+       
+        postLikesList[i] = _strToNum(postLikesList[i].text)
         
-
-    # Get Soup
-    try:
-        if(last_line.split(", ")[1].split('\n')[0] == today.strftime("%d/%m/%Y")):
-            print("Date already logged")
-            updatePostLikes = False
-    except IndexError:
-        pass
-
-    
-    soup = getPageSoup(pageName, updatePostLikes, scroll=True, maxScroll=maxScroll)
-
-    # Get page and post likes
-    pageLikes = getPageLikes(soup)
-    postLikesList = getPostLikes(soup)
-
-    print(pageName + " page likes: " + pageLikes)
-    print(pageName + " post likes: ", end="")
-    print(postLikesList)
-
-    plotLikes(pageName, postLikesList)
-
-
-    avLikes = sum(postLikesList)/len(postLikesList)
-    
-    
-    with open(logPath, "a") as fileHandle: 
-
-        if(last_line == ""):
-            
-            fileHandle.write("Page Likes, Date\n")
-
-        fileHandle.write(pageLikes + today.strftime(", %d/%m/%Y\n"))
+        
+    postLikesList = list(reversed(postLikesList))
 
     return postLikesList
                 
-            
-if __name__ == '__main__':
-    pagesToTrack = ["pointsbet", "sportsbetcomau", "zuck", "OliverTreemusic"]
-    for page in pagesToTrack:
-        postLikesList = scrapeLikes(page, maxScroll=100, updatePostLikes=False)
+def greedyScrapePage(pageName):
+
+
+    pageSoup = getPageSoup(pageName, maxScroll=50)
+  
+    pagePostLikesList = getPagePostLikes(pageSoup)
+
+    pageLikes = getPageLikes(pageSoup)
+
+
+    plotLikes(pageName, pagePostLikesList)
+
+    return pageLikes, pagePostLikesList
+
+
     
+if __name__ == '__main__':
+
+    # Page name is the string in the ur of page after www.facebook.com/
+    pageName = "pointsbet"
+
+    pageSoup = getPageSoup(pageName, maxScroll=10)
+
+
+    print(getPageLikes(pageSoup))
+
+    postLikesList = getPagePostLikes(pageSoup)
+    print(postLikesList)
+
+
+
+    plotLikes(pageName, postLikesList)
 
     # TODO =>
     # Lucas: 
@@ -264,8 +268,7 @@ if __name__ == '__main__':
     #   Make averging function
     #    
     #   
-    # Ted: 
-    #   redesign functions to decopule and de depth
+    # Ted:
     #   make pip installable
     #   scrape profiles
     
