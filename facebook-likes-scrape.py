@@ -75,94 +75,105 @@ def getPageLikes(pageSoup):
     with open(logPath, "a") as fileHandle:
         pass
 
-    last_line = ""
+    lastLine = ""
 
     # Check log file for the last line logged
     with open(logPath, "r") as fileHandle:
-        for last_line in fileHandle:
+        for lastLine in fileHandle:
             pass  
     
     today = date.today()
     
     try:
-        if(last_line.split(", ")[1].split('\n')[0] == today.strftime("%d/%m/%Y")):
-            print("Date already logged")
-
-        else:
-            
-            elementToScrape = "span"
-            classNumLikes = "oi732d6d ik7dh3pa d2edcug0 qv66sw1b c1et5uql jq4qci2q a3bd9o3v knj5qynh oo9gr5id"
-            indexNumLikes = 1
-            
-            # Extract number of page likes
-            numberOfLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
-            numberOfLikesArr = numberOfLikesArr[indexNumLikes].text.split(" ")[0].split(",")
-            
-
-            numberOfLikes = ""
-            lenArr = len(numberOfLikesArr)
-
-            for i in range(lenArr):
-                numberOfLikes = numberOfLikesArr[lenArr - i - 1] + numberOfLikes
-
-            return numberOfLikes
-
+        dateLogged = lastLine.split(", ")[1].split('\n')[0] == today.strftime("%d/%m/%Y")
     except IndexError:
-        print("No likes found in soup")
-        return
+        with open(logPath, "a") as fileHandle:
+            fileHandle.write(pageName + " page likes, date\n")
+            dateLogged = False
+    
+    if(dateLogged):
+        print("Date already logged")
+        return lastLine.split(", ")[0]
+    else:
+        
+        elementToScrape = "span"
+        classNumLikes = "oi732d6d ik7dh3pa d2edcug0 qv66sw1b c1et5uql jq4qci2q a3bd9o3v knj5qynh oo9gr5id"
+        indexNumLikes = 1
+        
+        # Extract number of page likes
+        numberOfLikesArr = pageSoup.find_all(elementToScrape, class_= classNumLikes)
+        numberOfLikesArr = numberOfLikesArr[indexNumLikes].text.split(" ")[0].split(",")
+        
+
+        numberOfLikes = ""
+        lenArr = len(numberOfLikesArr)
+
+        for i in range(lenArr):
+            numberOfLikes = numberOfLikesArr[lenArr - i - 1] + numberOfLikes
+
+        today = date.today()
+
+        with open(logPath, "a") as fileHandle:
+            fileHandle.write(numberOfLikes + today.strftime(", %d/%m/%Y\n"))
+            dateLogged = False
+
+        return numberOfLikes
+    
+    
 
 
-
-def getPageSoup(pageName, maxScroll=1):
+def getPageSoup(pageName, maxScroll=1, headless=True):
 
     # Get Authentifaction
     secret = _getSecretKeys()
 
-    # Likes 
-    xpath = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[3]/div[1]/div[4]/div[2]/div/div[1]/div[2]/div[1]/div/div/div/div[2]/div[3]/div[1]/div/div/div[2]/div/div/span/span[1]"
-
+    # Likes
+    xpath = "/html/body/div[1]/div/div/div[1]/div[3]/div/div/div[1]/div/div[4]/div[2]/div/div[1]/div[2]/div[1]/div/div/div/div[2]/div[4]/div/div/div[2]/div/div/span/span"
+    
     # Login to browser
-    driver = _FBLogin(secret["Username"], secret["Password"], pageName)
+    driver = _FBLogin(secret["Username"], secret["Password"], pageName, headless=headless)
     # Test login
     _printLoginTest(driver)
 
     # Try getting xpath element if not specified scroll and wait as neccassary
     try:
         
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-        
-        SCROLL_PAUSE_TIME = 1
-        RETRYS = 3
-
-        # Get scroll height
-        last_height = driver.execute_script("return document.body.scrollHeight")
-
-        for i in range(maxScroll):
-            print("Num Scrolls:", i)
-                
-            iterCount = 0
-            # Scroll down to bottom
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-
-            # Wait to load page
-            time.sleep(SCROLL_PAUSE_TIME)
-
-            # Calculate new scroll height and compare with last scroll height
-            new_height = driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height and iterCount == RETRYS:
-                break
-            elif new_height == last_height:
-                print("Retry", iterCount + 1, "for scroll", i)
-                iterCount+=1
-                i-=1
-               
-            last_height = new_height
+        WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath)))
     except:
         print("Exception element not located.")
 
-    finally:
-        pageSoup = BeautifulSoup(driver.page_source, 'html.parser')
-        driver.quit()
+            
+    SCROLL_PAUSE_TIME = 1
+    RETRYS = 3
+
+    # Get scroll height
+    last_height = driver.execute_script("return document.body.scrollHeight")
+
+    for i in range(maxScroll):
+        print("Num Scrolls:", i)
+            
+        iterCount = 0
+        # Scroll down to bottom
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+        # Wait to load page
+        time.sleep(SCROLL_PAUSE_TIME)
+
+        # Calculate new scroll height and compare with last scroll height
+        new_height = driver.execute_script("return document.body.scrollHeight")
+        if new_height == last_height and iterCount == RETRYS:
+            break
+        elif new_height == last_height:
+            print("Retry", iterCount + 1, "for scroll", i)
+            iterCount+=1
+            i-=1
+            
+        last_height = new_height
+
+
+    
+    pageSoup = BeautifulSoup(driver.page_source, 'html.parser')
+    driver.quit()
 
     _makeOutDirectory(pageName)
     _writeSoupToFile(pageSoup, pageName)
@@ -249,7 +260,7 @@ if __name__ == '__main__':
     # Page name is the string in the ur of page after www.facebook.com/
     pageName = "pointsbet"
 
-    pageSoup = getPageSoup(pageName, maxScroll=10)
+    pageSoup = getPageSoup(pageName, maxScroll=5, headless=False)
 
 
     print(getPageLikes(pageSoup))
