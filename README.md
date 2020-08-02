@@ -1,9 +1,6 @@
 # facebook-likes-scrape
-Scrape likes from points bet social media.
-Warning Facebook does not allow webscraping so ensure you have explicit written permission before running this script.
+Scrape likes from facebook.
+Warning webscraping from facebook is against terms of service, ensure that you have permission before running this script or risk your account being banned.
 
 
-![Likes over time image](https://github.com/ted-marozzi/pointsbet-scrape/blob/master/pointsbet.png?raw=true)
-
-
-scrapeLikes("pointsbet")
+![Likes over time image](https://github.com/ted-marozzi/pointsbet-scrape/blob/master/out/pointsbet/pointsbet.png?raw=true)
